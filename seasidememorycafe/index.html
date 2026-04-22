@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seaside Memory Café</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d1b2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+}
+#wrap { position: relative; }
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+#overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+#overlay.show { display: flex; }
+#orderCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+#orderTicket {
+  position: relative;
+  width: 400px;
+}
+#orderTicket img {
+  width: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+#orderInfo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24% 14% 30% 30%;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: bold;
+  color: #2a2a2a;
+  text-align: left;
+  line-height: 1.4;
+}
+#orderBtns { display: flex; gap: 14px; }
+.obtn {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  transition: transform 0.1s;
+}
+.obtn:active { transform: scale(0.95); }
+#btnRight { background: #4caf50; color: #fff; border-color: #2e7d32; }
+#btnAgain { background: #ff9800; color: #fff; border-color: #e65100; }
+
+/* ── Settings panel ── */
+#settingsPanel {
+  display: none;
+  position: absolute;
+  bottom: 52px;
+  right: 10px;
+  width: 220px;
+  background: #1a1f2e;
+  border: 3px solid #3a4060;
+  border-radius: 0;
+  image-rendering: pixelated;
+  font-family: 'Courier New', monospace;
+  color: #e8dcc8;
+  z-index: 30;
+  box-shadow: 4px 4px 0 #000;
+}
+#settingsPanel.open { display: block; }
+#settingsPanel .sp-title {
+  background: #3a4060;
+  color: #fdd835;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 6px 10px;
+  letter-spacing: 2px;
+  border-bottom: 2px solid #555a80;
+}
+#settingsPanel .sp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2a2f45;
+  font-size: 12px;
+  gap: 8px;
+}
+#volSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 6px;
+  border-radius: 0;
+  background: #3a4060;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid #555a80;
+}
+#volSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 0;
+  background: #fdd835;
+  cursor: pointer;
+  border: 2px solid #c8a800;
+}
+.sp-btn {
+  width: 100%;
+  padding: 7px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 2px solid #555a80;
+  background: #2a2f45;
+  color: #e8dcc8;
+  border-radius: 0;
+  text-align: left;
+  transition: background 0.1s;
+}
+.sp-btn:hover { background: #3a4060; }
+.sp-btn.danger { border-color: #c0392b; color: #ff6b6b; }
+.sp-btn.danger:hover { background: #3a1515; }
+/* Gear button */
+#gearBtn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 28px; height: 28px;
+  background: #1a1f2e;
+  border: 2px solid #3a4060;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  box-shadow: 2px 2px 0 #000;
+  border-radius: 0;
+  transition: background 0.1s;
+}
+#gearBtn:hover { background: #3a4060; }
+</style>
+</head>
+<body>
+<audio id="bgm" src="assets/BackgroundMusic.mp3" loop></audio>
+
+
+<script>
+  const bgm = document.getElementById('bgm');
+  bgm.volume = 0.125;
+  bgm.currentTime = 21;
+
+  const duckSfx = new Audio('assets/duck.mp3');
+  duckSfx.volume = 0.60;
+  window.playDuckSound = function() {
+    duckSfx.currentTime = 0;
+    duckSfx.play();
+    setTimeout(() => duckSfx.pause(), 300);
+  };
+
+  const moneySfx = new Audio('assets/money.mp3');
+  moneySfx.volume = 0.30;
+  window.playMoneySound = function() {
+    moneySfx.currentTime = 0;
+    moneySfx.play();
+    setTimeout(() => moneySfx.pause(), 500);
+  };
+
+  const angrySfx = new Audio('assets/angry.mp3');
+  angrySfx.volume = 0.70;
+  window.playAngrySound = function() {
+    angrySfx.currentTime = 0;
+    angrySfx.play();
+    setTimeout(() => angrySfx.pause(), 1000);
+  };
+  document.addEventListener('click', () => bgm.play(), { once: true });
+</script>
+
+<div id="wrap">
+  <canvas id="c" width="960" height="540"></canvas>
+
+  <!-- Settings panel -->
+  <div id="settingsPanel">
+    <div class="sp-title">⚙ SETTINGS</div>
+    <div class="sp-row">
+      <span>♪ Music</span>
+      <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.125">
+    </div>
+    <div class="sp-row" style="padding:6px 12px">
+      <button class="sp-btn" id="btnMute">🔊 Mute</button>
+    </div>
+    <div class="sp-row" style="padding:6px 12px">
+      <button class="sp-btn" id="btnPause">⏸ Pause</button>
+    </div>
+    <div class="sp-row" style="padding:6px 12px">
+      <button class="sp-btn" id="btnFullscreen">⛶ Fullscreen</button>
+    </div>
+    <div class="sp-row" style="padding:6px 12px">
+      <button class="sp-btn danger" id="btnRestart">🔄 Restart</button>
+    </div>
+  </div>
+
+  <!-- Gear button -->
+  <button id="gearBtn">⚙</button>
+  <div id="overlay">
+    <div id="orderCard">
+      <div id="orderTicket">
+        <img src="assets/order.png.png" alt="">
+        <div id="orderInfo"></div>
+      </div>
+      <div id="orderBtns">
+        <button class="obtn" id="btnRight">&#10003; Right</button>
+        <button class="obtn" id="btnAgain">&#8629; Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 960, H = 540;
+
+// ── Asset loader ──────────────────────────────────────────────────────────────
+const IMG = {};
+const ASSETS = [
+  'background_v3','bottle_happy','bottle_normal','bottle_angry',
+  'cat_walk_1','cat_walk_2','seon_back_1','seon_back_2',
+  'duck','order','milk_tea','pineapple_bun','red_bean_ice','siu_mai'
+];
+function loadAll(cb) {
+  let n = 0;
+  ASSETS.forEach(k => {
+    const img = new Image();
+    IMG[k] = img;
+    img.onload = img.onerror = () => { if (++n === ASSETS.length) cb(); };
+    img.src = `assets/${k}.png.png`;
+  });
+}
+
+// ── Layout (pixel-aligned to background_v3 at 960×540) ───────────────────────
+// Background original: 2752×1536.  Scale: 960/2752 ≈ 0.349,  540/1536 ≈ 0.352
+// Table centers: booth numbered circles measured from the background image.
+const TABLES = [
+  { id: 1, x: 700, y: 195 },   // booth ① — blue table centre
+  { id: 2, x: 852, y: 195 },   // booth ② — blue table centre
+  { id: 3, x: 700, y: 375 },   // booth ③ — blue table centre
+  { id: 4, x: 852, y: 375 },   // booth ④ — blue table centre
+];
+
+// ── Bottle positions (manual override per table) ──────────────────────────────
+// Adjust x/y here to move each bottle sprite independently from table logic.
+const BOTTLE_POS = {
+  1: { x: 775, y: 250 },  // table 1
+  2: { x: 845, y: 250 },  // table 2
+  3: { x: 685, y: 400 },  // table 3
+  4: { x: 845, y: 400 },  // table 4
+};
+
+// ── Food-on-table positions (manual override per table) ───────────────────────
+// Adjust x/y here to move the food sprite shown during the eating phase.
+const FOOD_ON_TABLE_POS = {
+  1: { x: 730, y: 195 },  // table 1
+  2: { x: 890, y: 195 },  // table 2
+  3: { x: 730, y: 375 },  // table 3
+  4: { x: 890, y: 375 },  // table 4
+};
+
+// Kitchen counter: the brown pass-through bench at the bottom-left of the scene.
+// Food appears here when ready; cat walks up to it to trigger Order Check.
+const KZ = { x: 8, y: 460, w: 300, h: 70 };
+const KZ_PICKUP_DIST = 65; // px — cat must be this close to the counter centre
+
+// Collision walls — rectangles covering every non-green area
+const WALLS = [
+  { x:   0, y:  170, w: 960, h:  100 }, // top wall / ceiling strip
+  { x:   0, y:  62, w:  90, h: 330 }, // left kitchen equipment column
+  { x:  90, y:  62, w: 80, h:  96 }, // stove & upper-counter surface
+  { x: 250, y: 150, w: 90, h: 270 }, // cardboard box stack
+  { x:   0, y: 520, w: 800, h:  85 }, // brown pass-through counter
+  { x: 650, y: 400, w: 800, h:  300 }, // bottom-right wall
+];
+const CAT_R = 12; // collision radius for the cat's feet
+function blocked(x, y) {
+  return WALLS.some(w =>
+    x + CAT_R > w.x && x - CAT_R < w.x + w.w &&
+    y + CAT_R > w.y && y - CAT_R < w.y + w.h
+  );
+}
+
+// Seon: stands at the stove (far-left kitchen)
+const SEON = { x: 100, y: 300 };
+
+// ── Food data ─────────────────────────────────────────────────────────────────
+const FOODS = ['milk_tea', 'pineapple_bun', 'red_bean_ice', 'siu_mai'];
+const FOOD_NAME  = { milk_tea:'Milk Tea', pineapple_bun:'Pineapple Bun', red_bean_ice:'Red Bean Ice', siu_mai:'Siu Mai' };
+const FOOD_PRICE = { milk_tea:15, pineapple_bun:18, red_bean_ice:22, siu_mai:25 };
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))
+    e.preventDefault();
+  if (e.key.toLowerCase() === 'r') {
+    const hf = G.cat.heldFood;
+    if (hf) {
+      G.readyOrder = { tableId: hf.tableId, food: hf.food, actualFood: hf.actualFood || hf.food };
+      G.cat.heldFood = null;
+    }
+  }
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function hypot(ax, ay, bx, by) { return Math.sqrt((ax-bx)**2 + (ay-by)**2); }
+
+function drawImg(k, x, y, w, h, flipX) {
+  const i = IMG[k];
+  if (!i || !i.naturalWidth) return;
+  if (flipX) {
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(i, -(x + w), y, w, h);
+    ctx.restore();
+  } else {
+    ctx.drawImage(i, x, y, w, h);
+  }
+}
+
+// ── Game State ────────────────────────────────────────────────────────────────
+const G = {
+  cat: {
+    x: 500, y: 410,
+    frame: 0, ft: 0,
+    heldFood: null,   // { tableId, food }
+    facingR: true,
+  },
+  seon: { frame: 0, ft: 0, cookT: 0, cookDur: 5.5, thought: '', thoughtT: 0 },
+  duck: {
+    x: 680, y: 270,
+    vx: 224, vy: 224,
+    wt: 0, wd: 2.2,
+    r: 22,
+    clicks: 0,
+    hidden: false,
+    hideT: 0,
+    scale: 1,
+  },
+  customers: TABLES.map(t => ({
+    tableId: t.id,
+    food: FOODS[Math.floor(Math.random() * FOODS.length)],
+    drift: 0,
+    ds: rnd(1.5, 1.8),
+  })),
+  readyOrder: null,  // { tableId, food } – waiting at counter
+  redoOrder: null,   // { tableId, food, t } — correct remake pending after 3s
+  orderOpen: false,
+  score: 0,
+  banner: { text: '', t: 0 },
+  respawnTimers: {}, // tableId → seconds remaining before respawn
+  eatingTables: {},  // tableId → { food, t } — food stays on table while customer eats
+  cookCount: 0,      // increments each time Seon finishes an order; every 4th is wrong
+  lastServedTableId: null, // excluded from next cook pick
+  floats: [],        // floating money labels: { x, y, text, t, maxT }
+  timeLeft: 180,     // 3-minute countdown in seconds
+};
+
+function respawnAt(tableId, delay = 0) {
+  if (delay > 0) {
+    G.respawnTimers[tableId] = delay;
+  } else {
+    G.customers.push({
+      tableId,
+      food: FOODS[Math.floor(Math.random() * FOODS.length)],
+      drift: 0,
+      ds: rnd(1.5, 1.8),
+    });
+  }
+}
+
+// ── Update ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  const cat = G.cat;
+
+  // Cat movement (WASD / arrow keys)
+  let vx = 0, vy = 0;
+  if (keys['a'] || keys['arrowleft'])  { vx -= 145; cat.facingR = false; }
+  if (keys['d'] || keys['arrowright']) { vx += 145; cat.facingR = true; }
+  if (keys['w'] || keys['arrowup'])    vy -= 145;
+  if (keys['s'] || keys['arrowdown'])  vy += 145;
+  if (vx && vy) { vx *= 0.707; vy *= 0.707; }
+  const nx = Math.max(CAT_R, Math.min(W - CAT_R, cat.x + vx * dt));
+  const ny = Math.max(CAT_R, Math.min(H - CAT_R, cat.y + vy * dt));
+  if (!blocked(nx, ny))        { cat.x = nx; cat.y = ny; }
+  else if (!blocked(nx, cat.y)) { cat.x = nx; }
+  else if (!blocked(cat.x, ny)) { cat.y = ny; }
+  if (vx || vy) { cat.ft += dt; if (cat.ft > 0.14) { cat.ft = 0; cat.frame ^= 1; } }
+
+  // Seon animation + auto-cook
+  G.seon.ft += dt;
+  if (G.seon.ft > 0.38) { G.seon.ft = 0; G.seon.frame ^= 1; }
+
+  // Seon thought cycle while cooking
+  if (!G.readyOrder && G.customers.length) {
+    G.seon.thoughtT -= dt;
+    if (G.seon.thoughtT <= 0) {
+      const seonThoughts = ['Hmm...\nwhat next?', 'Almost\nready!', 'My best\nrecipe!', 'Careful\nnow...', 'Nearly\ndone!', 'Secret\ningredient!'];
+      G.seon.thought = seonThoughts[Math.floor(Math.random() * seonThoughts.length)];
+      G.seon.thoughtT = 4;
+    }
+  } else {
+    G.seon.thought = '';
+  }
+
+  if (!G.readyOrder && G.customers.length) {
+    G.seon.cookT += dt;
+    if (G.seon.cookT >= G.seon.cookDur) {
+      G.seon.cookT = 0;
+      const baseEligible = G.customers.filter(c =>
+        !c.eating && !G.eatingTables[c.tableId] && !G.respawnTimers[c.tableId]
+      );
+      const eligible = baseEligible.filter(c => c.tableId !== G.lastServedTableId).length > 0
+        ? baseEligible.filter(c => c.tableId !== G.lastServedTableId)
+        : baseEligible;
+      if (eligible.length) {
+        const c = eligible[Math.floor(Math.random() * eligible.length)];
+        G.cookCount++;
+        const isWrongCook = (G.cookCount % 4 === 0);
+        const otherFoods = FOODS.filter(f => f !== c.food);
+        const actualFood = isWrongCook
+          ? otherFoods[Math.floor(Math.random() * otherFoods.length)]
+          : c.food;
+        G.readyOrder = { tableId: c.tableId, food: c.food, actualFood };
+      }
+    }
+  }
+
+  // Customer drift (skip eating customers)
+  const duckVisible = !G.duck.hidden;
+  G.customers.forEach(c => {
+    if (c.eating) return;
+    const tbl = TABLES.find(t => t.id === c.tableId);
+    const duckNear = tbl && hypot(G.duck.x, G.duck.y, tbl.x, tbl.y) < 85;
+    const duckMult = duckVisible ? 1.2 : 1;
+    c.drift = Math.min(100, c.drift + c.ds * (duckNear ? 2.5 : 1) * duckMult * dt);
+  });
+
+  // Remove customers who fully drifted away — immediately respawn at same table
+  const gone = new Set(G.customers.filter(c => c.drift >= 100).map(c => c.tableId));
+  G.customers = G.customers.filter(c => c.drift < 100);
+  if (G.readyOrder && gone.has(G.readyOrder.tableId)) G.readyOrder = null;
+  if (cat.heldFood   && gone.has(cat.heldFood.tableId)) cat.heldFood = null;
+  gone.forEach(id => {
+    G.score -= 5;
+    G.banner.text = 'Customer left! -5';
+    G.banner.t = 1.5;
+    respawnAt(id);
+  });
+
+  // Redo order timer (3s remake after clicking Again on a wrong order)
+  if (G.redoOrder) {
+    G.redoOrder.t -= dt;
+    if (G.redoOrder.t <= 0) {
+      G.readyOrder = { tableId: G.redoOrder.tableId, food: G.redoOrder.food, actualFood: G.redoOrder.food };
+      G.redoOrder = null;
+    }
+  }
+
+  // Respawn timers
+  for (const id in G.respawnTimers) {
+    G.respawnTimers[id] -= dt;
+    if (G.respawnTimers[id] <= 0) {
+      delete G.respawnTimers[id];
+      respawnAt(Number(id));
+    }
+  }
+
+  // Banner timer
+  if (G.banner.t > 0) G.banner.t -= dt;
+
+  // Duck wander (stays in dining area)
+  const dk = G.duck;
+  if (dk.hidden) {
+    dk.hideT -= dt;
+    if (dk.hideT <= 0) { dk.hidden = false; dk.clicks = 0; dk.scale = 1; dk.x = 680; dk.y = 270; }
+  } else {
+    dk.scale *= Math.pow(1.25, dt); // +25% per second
+    const spd = 224;
+    dk.x += dk.vx * dt;
+    dk.y += dk.vy * dt;
+    if (dk.x < 22)      { dk.x = 22;      dk.vx =  spd; }
+    if (dk.x > W - 22)  { dk.x = W - 22;  dk.vx = -spd; }
+    if (dk.y < 22)      { dk.y = 22;      dk.vy =  spd; }
+    if (dk.y > H - 22)  { dk.y = H - 22;  dk.vy = -spd; }
+  }
+
+  // Deliver food when cat reaches target table
+  if (cat.heldFood) {
+    const tbl = TABLES.find(t => t.id === cat.heldFood.tableId);
+    const bp = tbl && (BOTTLE_POS[tbl.id] || tbl);
+    if (tbl && (hypot(cat.x, cat.y, tbl.x, tbl.y) < 70 || hypot(cat.x, cat.y, bp.x, bp.y) < 70)) {
+      const idx = G.customers.findIndex(c => c.tableId === tbl.id && !c.eating);
+      if (idx !== -1) {
+        const servedTableId = cat.heldFood.tableId;
+        G.lastServedTableId = servedTableId;
+        const orderedFood = cat.heldFood.food;
+        const deliveredFood = cat.heldFood.actualFood || orderedFood;
+        const isWrong = deliveredFood !== orderedFood;
+        const earn = isWrong ? -10 : FOOD_PRICE[orderedFood];
+        G.score += earn;
+        if (!isWrong && window.playMoneySound) window.playMoneySound();
+        if (isWrong && window.playAngrySound) window.playAngrySound();
+        const floatBp = BOTTLE_POS[servedTableId] || tbl;
+        G.floats.push({ x: floatBp.x, y: floatBp.y - 60, text: (earn > 0 ? '+' : '') + earn, t: 1.6, maxT: 1.6 });
+        if (isWrong) { G.banner.text = 'Wrong order! -10'; G.banner.t = 2; }
+        G.customers[idx].eating = true;
+        G.customers[idx].wrongOrder = isWrong;
+        const goodT = ['Mmm! So\ndelicious!', 'Yummy!\nPerfect!', 'Amazing\nfood!'];
+        const badT  = ['Wait, I ordered\nsomething else!', 'Hmm... this\nisnt right?', 'Not what I\nwanted...'];
+        const tPool = isWrong ? badT : goodT;
+        const thought = tPool[Math.floor(Math.random() * tPool.length)];
+        G.eatingTables[servedTableId] = { food: deliveredFood, t: 5, thought };
+        cat.heldFood = null;
+      }
+    }
+  }
+
+  // Eating timers — remove customer and start respawn after eating finishes
+  for (const id in G.eatingTables) {
+    G.eatingTables[id].t -= dt;
+    if (G.eatingTables[id].t <= 0) {
+      const tableId = Number(id);
+      delete G.eatingTables[id];
+      const idx = G.customers.findIndex(c => c.tableId === tableId && c.eating);
+      if (idx !== -1) G.customers.splice(idx, 1);
+      respawnAt(tableId, 10);
+    }
+  }
+
+  // Tick floating labels
+  G.floats = G.floats.filter(f => { f.t -= dt; f.y -= 28 * dt; return f.t > 0; });
+
+  // Auto-open Order Check when cat walks close to the counter (and order is ready)
+  if (G.readyOrder && !cat.heldFood && !G.orderOpen) {
+    const cx = KZ.x + KZ.w / 2, cy = KZ.y + KZ.h / 2;
+    if (hypot(cat.x, cat.y, cx, cy) < KZ_PICKUP_DIST) {
+      openOrderCheck();
+    }
+  }
+
+  // Spawn new customers on timer
+  G.spawnT += dt;
+  if (G.spawnT >= G.spawnDur) { G.spawnT = 0; spawnCustomer(); }
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function draw() {
+  // Background
+  drawImg('background_v3', 0, 0, W, H, false);
+
+  // Counter: food icon + glow when order is waiting for pickup
+  if (G.readyOrder && !G.cat.heldFood) {
+    const p = 0.28 + 0.22 * Math.sin(Date.now() / 300);
+    ctx.save();
+    ctx.globalAlpha = p;
+    ctx.fillStyle = '#ffe566';
+    ctx.fillRect(KZ.x, KZ.y, KZ.w, KZ.h);
+    ctx.globalAlpha = Math.min(1, p + 0.35);
+    ctx.strokeStyle = '#ffcc00';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(KZ.x, KZ.y, KZ.w, KZ.h);
+    ctx.restore();
+
+    // Food sprite centered on the counter surface, gently bobbing
+    const cx = KZ.x + KZ.w / 2;
+    const cy = KZ.y + KZ.h / 2;
+    const bob = Math.sin(Date.now() / 210) * 2.5;
+    drawImg(G.readyOrder.actualFood || G.readyOrder.food, cx - 29, cy - 29 + bob - 5, 57, 57, false);
+  }
+
+  // Food sprites + thought bubbles on tables during eating
+  for (const id in G.eatingTables) {
+    const et = G.eatingTables[id];
+    const fp = FOOD_ON_TABLE_POS[Number(id)] || TABLES.find(t => t.id === Number(id));
+    const bp = BOTTLE_POS[Number(id)] || fp;
+    if (!fp) continue;
+    drawImg(et.food, fp.x - 24, fp.y - 24, 48, 48, false);
+
+    // Thought bubble above bottle
+    if (bp && et.thought) {
+      ctx.save();
+      ctx.font = 'bold 10px "Courier New"';
+      const lines = et.thought.split('\n');
+      const lw = Math.max(...lines.map(l => ctx.measureText(l).width));
+      const pad = 7, lh = 13;
+      const bw = lw + pad * 2, bh = lines.length * lh + pad * 2;
+      const bx = bp.x - bw / 2, by = bp.y - 90 - bh;
+
+      // Bubble body
+      ctx.fillStyle = '#fff';
+      fillRoundRect(bx, by, bw, bh, 6);
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Bubble tail (three dots)
+      [0, 1, 2].forEach(i => {
+        const r = 3 - i;
+        ctx.beginPath();
+        ctx.arc(bp.x - 6 + i * 5, by + bh + 4 + i * 5, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#ccc';
+        ctx.stroke();
+      });
+
+      // Text
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'center';
+      lines.forEach((line, li) => {
+        ctx.fillText(line, bp.x, by + pad + lh * (li + 1) - 2);
+      });
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+  }
+
+  // Customers (bottles) at tables
+  G.customers.forEach(c => {
+    const tbl = TABLES.find(t => t.id === c.tableId);
+    if (!tbl) return;
+    const bp = BOTTLE_POS[c.tableId] || tbl;
+    const bk = c.eating ? (c.wrongOrder ? 'bottle_angry' : 'bottle_happy') : c.drift < 40 ? 'bottle_happy' : c.drift < 70 ? 'bottle_normal' : 'bottle_angry';
+    drawImg(bk, bp.x - 19, bp.y - 58, 38, 48, false);
+
+    // Drift progress bar above bottle
+    const bx = bp.x - 19, by = bp.y - 64;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(bx, by, 38, 5);
+    ctx.fillStyle = c.drift < 40 ? '#5ec45f' : c.drift < 70 ? '#ff9c2a' : '#e84040';
+    ctx.fillRect(bx, by, 38 * c.drift / 100, 5);
+
+    // Cyan ring on the target table when cat is holding the matching food
+    if (G.cat.heldFood && G.cat.heldFood.tableId === c.tableId) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.4 * Math.sin(Date.now() / 200);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y - 28, 32, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+
+  // Seon
+  drawImg(`seon_back_${G.seon.frame + 1}`, SEON.x - 44, SEON.y - 158, 158, 128, false);
+  if (G.seon.thought) {
+    ctx.save();
+    ctx.font = 'bold 10px "Courier New"';
+    const lines = G.seon.thought.split('\n');
+    const lw = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const pad = 7, lh = 13;
+    const bw = lw + pad * 2, bh = lines.length * lh + pad * 2;
+    const bx = SEON.x + 10, by = SEON.y - 170 - bh;
+    ctx.fillStyle = '#fff';
+    fillRoundRect(bx, by, bw, bh, 6);
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.stroke();
+    [0,1,2].forEach(i => {
+      ctx.beginPath();
+      ctx.arc(bx + 6 - i * 4, by + bh + 4 + i * 5, 3 - i, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.strokeStyle = '#ccc'; ctx.stroke();
+    });
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'left';
+    lines.forEach((line, li) => ctx.fillText(line, bx + pad, by + pad + lh * (li + 1) - 2));
+    ctx.restore();
+  }
+
+  // Duck
+  if (!G.duck.hidden) {
+    const ds = G.duck.scale;
+    drawImg('duck', G.duck.x - 40 * ds, G.duck.y - 34 * ds, 80 * ds, 68 * ds, G.duck.vx < 0);
+  }
+
+  // Cat
+  const cat = G.cat;
+  drawImg(`cat_walk_${cat.frame + 1}`, cat.x - 48, cat.y - 96, 70, 70, !cat.facingR);
+
+  // Held food floats + bobs above cat's head
+  if (cat.heldFood) {
+    const bob = Math.sin(Date.now() / 190) * 3;
+    drawImg(cat.heldFood.actualFood || cat.heldFood.food, cat.x - 18, cat.y - 96 - 34 + bob, 36, 36, false);
+  }
+
+  // ── HUD ──
+  ctx.save();
+
+  // Score pill
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  fillRoundRect(8, 8, 136, 30, 6);
+  drawCoin(22, 23, 9);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 15px "Courier New"';
+  ctx.fillText(`${G.score}`, 36, 27);
+
+  // Timer top-right
+  const mins = Math.floor(G.timeLeft / 60);
+  const secs = Math.floor(G.timeLeft % 60);
+  const timerStr = `${mins}:${String(secs).padStart(2, '0')}`;
+  const timerW = 80;
+  ctx.fillStyle = G.timeLeft <= 30 ? 'rgba(180,30,30,0.85)' : 'rgba(0,0,0,0.62)';
+  fillRoundRect(W - timerW - 8, 8, timerW, 30, 6);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 15px "Courier New"';
+  ctx.textAlign = 'center';
+  ctx.fillText(timerStr, W - timerW / 2 - 8, 27);
+  ctx.textAlign = 'left';
+
+  // Floating money labels
+  G.floats.forEach(f => {
+    const alpha = Math.min(1, f.t / (f.maxT * 0.4));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawCoin(f.x - 22, f.y, 8);
+    ctx.fillStyle = '#fdd835';
+    ctx.font = 'bold 13px "Courier New"';
+    ctx.textAlign = 'left';
+    ctx.fillText(f.text, f.x - 11, f.y + 5);
+    ctx.restore();
+  });
+
+  // Status banner
+  if (G.readyOrder && !cat.heldFood) {
+    ctx.fillStyle = 'rgba(255,218,0,0.92)';
+    fillRoundRect(W / 2 - 148, 8, 296, 30, 6);
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('Order ready!  Walk to the counter ↙', W / 2, 27);
+    ctx.textAlign = 'left';
+  } else if (cat.heldFood) {
+    ctx.fillStyle = 'rgba(0,200,255,0.88)';
+    fillRoundRect(W / 2 - 148, 8, 296, 30, 6);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Deliver to Table ${cat.heldFood.tableId}!`, W / 2, 27);
+    ctx.textAlign = 'left';
+
+    // Return button — always visible when carrying food
+    ctx.fillStyle = 'rgba(230,120,0,0.92)';
+    fillRoundRect(W / 2 - 80, 44, 160, 26, 6);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('↩ Return food  [R]', W / 2, 61);
+    ctx.textAlign = 'left';
+  }
+
+  // Controls hint (bottom-right)
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+
+  // Duck click banner
+  if (G.banner.t > 0) {
+    const alpha = Math.min(1, G.banner.t / 0.4);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 22px "Courier New"';
+    const tw = ctx.measureText(G.banner.text).width;
+    const bw = tw + 40, bh = 44;
+    const bx = (W - bw) / 2, by = (H - bh) / 2;
+    ctx.fillStyle = 'rgba(20,20,20,0.78)';
+    fillRoundRect(bx, by, bw, bh, 10);
+    ctx.fillStyle = '#fff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(G.banner.text, bx + 20, by + bh / 2);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// Coin icon helper
+function drawCoin(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#fdd835';
+  ctx.fill();
+  ctx.strokeStyle = '#f9a825';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#f57f17';
+  ctx.font = `bold ${r + 2}px "Courier New"`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('$', x, y + 1);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+}
+
+// Rounded rect helper (avoids relying on ctx.roundRect availability)
+function fillRoundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let lastT = 0;
+let gameOver = false;
+let inMenu = true;
+let paused = false;
+
+function restartGame() {
+  gameOver = false;
+  inMenu = false;
+  paused = false;
+  G.score = 0;
+  G.timeLeft = 180;
+  G.readyOrder = null;
+  G.redoOrder = null;
+  G.orderOpen = false;
+  G.banner = { text: '', t: 0 };
+  G.respawnTimers = {};
+  G.eatingTables = {};
+  G.floats = [];
+  G.cookCount = 0;
+  G.lastServedTableId = null;
+  G.cat = { x: 500, y: 410, frame: 0, ft: 0, heldFood: null, facingR: true };
+  G.seon = { frame: 0, ft: 0, cookT: 0, cookDur: 5.5, thought: '', thoughtT: 0 };
+  G.duck = { x: 680, y: 270, vx: 224, vy: 224, wt: 0, wd: 2.2, r: 22, clicks: 0, hidden: false, hideT: 0, scale: 1 };
+  G.customers = TABLES.map(t => ({ tableId: t.id, food: FOODS[Math.floor(Math.random() * FOODS.length)], drift: 0, ds: rnd(1.5, 1.8) }));
+  document.getElementById('overlay').classList.remove('show');
+  lastT = performance.now();
+}
+
+// Menu start button rect (for click detection)
+const MENU_BTN = { x: W/2 - 100, y: 430, w: 200, h: 44 };
+
+function drawMenu() {
+  // Background fill
+  ctx.drawImage(IMG['background_v3'], 0, 0, W, H);
+  ctx.fillStyle = 'rgba(10,18,30,0.72)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Title
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffe082';
+  ctx.font = 'bold 36px "Courier New"';
+  ctx.fillText('Seaside Memory Café', W/2, 68);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillRect(W/2 - 280, 78, 560, 2);
+
+  // Characters panel
+  const entries = [
+    { key: 'cat_walk_1',    label: 'You (the Cat)',   desc: 'Move with WASD. Pick up orders from\nthe counter and deliver to the right table.' },
+    { key: 'seon_back_1',   label: 'Seon (the Cook)', desc: 'Prepares food — but sometimes the dish\nmight be wrong. Click Again on the receipt to redo.' },
+    { key: 'bottle_happy',  label: 'Customers',       desc: 'Wait at tables. Deliver in time or\nthey leave angry. Score per dish.' },
+    { key: 'duck',          label: 'The Duck',        desc: 'Bounces around making customers impatient.\nClick on it to chase it away!' },
+  ];
+
+  const startY = 108, rowH = 80;
+  entries.forEach((e, i) => {
+    const y = startY + i * rowH;
+    // Row bg
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    fillRoundRect(W/2 - 280, y, 560, rowH - 6, 8);
+    // Sprite
+    const img = IMG[e.key];
+    if (img && img.naturalWidth) ctx.drawImage(img, W/2 - 262, y + 10, 44, 44);
+    // Label
+    ctx.fillStyle = '#ffe082';
+    ctx.font = 'bold 14px "Courier New"';
+    ctx.textAlign = 'left';
+    ctx.fillText(e.label, W/2 - 206, y + 24);
+    // Desc
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.font = '12px "Courier New"';
+    e.desc.split('\n').forEach((line, li) => {
+      ctx.fillText(line, W/2 - 206, y + 42 + li * 16);
+    });
+  });
+
+  // Start button
+  ctx.fillStyle = '#4caf50';
+  fillRoundRect(MENU_BTN.x, MENU_BTN.y, MENU_BTN.w, MENU_BTN.h, 10);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.textAlign = 'center';
+  ctx.fillText('▶  Start', W/2, MENU_BTN.y + 29);
+
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+function drawGameOver() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(0, 0, W, H);
+  const bw = 420, bh = 160, bx = (W - bw) / 2, by = (H - bh) / 2;
+  ctx.fillStyle = '#fffde7';
+  fillRoundRect(bx, by, bw, bh, 18);
+  ctx.fillStyle = '#3e2a00';
+  ctx.font = 'bold 32px "Courier New"';
+  ctx.textAlign = 'center';
+  ctx.fillText('☕ Café Closed!', W / 2, by + 58);
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillText(`Final Score: ${G.score}`, W / 2, by + 96);
+  ctx.font = '14px "Courier New"';
+  ctx.fillStyle = '#888';
+  ctx.fillText('Refresh to play again', W / 2, by + 130);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+function loop(ts) {
+  const dt = Math.min((ts - lastT) / 1000, 0.05);
+  lastT = ts;
+  if (inMenu)    { drawMenu(); requestAnimationFrame(loop); return; }
+  if (gameOver)  { draw(); drawGameOver(); requestAnimationFrame(loop); return; }
+  if (!paused && !G.orderOpen) {
+    update(dt);
+    G.timeLeft = Math.max(0, G.timeLeft - dt);
+  }
+  if (G.score >= 250 || G.timeLeft <= 0) { gameOver = true; }
+  draw();
+  if (gameOver) { drawGameOver(); return; }
+  requestAnimationFrame(loop);
+}
+
+// ── Canvas click handler ──────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  const mx = (e.clientX - r.left) * (W / r.width);
+  const my = (e.clientY - r.top)  * (H / r.height);
+
+  // Menu start button
+  if (inMenu) {
+    if (mx >= MENU_BTN.x && mx <= MENU_BTN.x + MENU_BTN.w &&
+        my >= MENU_BTN.y && my <= MENU_BTN.y + MENU_BTN.h) {
+      inMenu = false;
+      lastT = performance.now();
+    }
+    return;
+  }
+
+  // Click duck → shoo / disappear after 3 clicks
+  if (!G.duck.hidden && hypot(mx, my, G.duck.x, G.duck.y) < (G.duck.r + 12) * G.duck.scale) {
+    if (window.playDuckSound) window.playDuckSound();
+    G.duck.clicks++;
+    if (G.duck.clicks >= 3) {
+      G.duck.hidden = true;
+      G.duck.hideT  = 15;
+      G.banner.text = 'The duck ran away!';
+      G.banner.t = 2;
+    } else {
+      G.duck.vx = (Math.random() < 0.5 ? -1 : 1) * 224;
+      G.duck.vy = (Math.random() < 0.5 ? -1 : 1) * 224;
+      const left = 3 - G.duck.clicks;
+      G.banner.text = `Click the duck ${left} more time${left > 1 ? 's' : ''}!`;
+      G.banner.t = 1.5;
+    }
+    G.duck.wt = -5; // delay next wander
+    return;
+  }
+
+  // (Order Check opens automatically when cat walks up to the counter)
+});
+
+// ── Order Check UI ────────────────────────────────────────────────────────────
+function openOrderCheck() {
+  G.orderOpen = true;
+  const o = G.readyOrder;
+  document.getElementById('orderInfo').innerHTML =
+    `<p style="margin:0">Table <b>${o.tableId}</b></p>`+
+    `<p style="margin:0">${FOOD_NAME[o.food]}&nbsp; $${FOOD_PRICE[o.food]}</p>`;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeOrderCheck() {
+  G.orderOpen = false;
+  document.getElementById('overlay').classList.remove('show');
+}
+
+document.getElementById('btnRight').onclick = () => {
+  if (!G.readyOrder) return;
+  G.cat.heldFood = { ...G.readyOrder };
+  G.readyOrder = null;
+  closeOrderCheck();
+};
+
+document.getElementById('btnAgain').onclick = () => {
+  if (G.readyOrder) {
+    G.redoOrder = { tableId: G.readyOrder.tableId, food: G.readyOrder.food, t: 3 };
+    G.readyOrder = null;
+  }
+  closeOrderCheck();
+};
+
+// ── Loading screen + boot ─────────────────────────────────────────────────────
+ctx.fillStyle = '#0d1b2a';
+ctx.fillRect(0, 0, W, H);
+ctx.fillStyle = '#aaa';
+ctx.font = '18px "Courier New"';
+ctx.textAlign = 'center';
+ctx.fillText('Loading…', W / 2, H / 2);
+ctx.textAlign = 'left';
+
+loadAll(() => {
+  lastT = performance.now();
+  requestAnimationFrame(loop);
+
+  // Gear button toggles settings panel
+  document.getElementById('gearBtn').addEventListener('click', () => {
+    document.getElementById('settingsPanel').classList.toggle('open');
+  });
+
+  // Close panel when clicking outside
+  document.addEventListener('click', e => {
+    const panel = document.getElementById('settingsPanel');
+    if (!panel.contains(e.target) && e.target.id !== 'gearBtn') {
+      panel.classList.remove('open');
+    }
+  });
+
+  // Volume slider
+  document.getElementById('volSlider').addEventListener('input', e => {
+    bgm.volume = parseFloat(e.target.value);
+    bgm.muted = false;
+    document.getElementById('btnMute').textContent = '🔊 Mute';
+  });
+
+  // Mute
+  document.getElementById('btnMute').addEventListener('click', () => {
+    bgm.muted = !bgm.muted;
+    document.getElementById('btnMute').textContent = bgm.muted ? '🔇 Unmute' : '🔊 Mute';
+  });
+
+  // Pause
+  document.getElementById('btnPause').addEventListener('click', () => {
+    paused = !paused;
+    document.getElementById('btnPause').textContent = paused ? '▶ Resume' : '⏸ Pause';
+  });
+
+  // Fullscreen
+  document.getElementById('btnFullscreen').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.getElementById('wrap').requestFullscreen && document.getElementById('wrap').requestFullscreen();
+      document.getElementById('btnFullscreen').textContent = '✕ Exit Fullscreen';
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+      document.getElementById('btnFullscreen').textContent = '⛶ Fullscreen';
+    }
+  });
+
+  // Restart
+  document.getElementById('btnRestart').addEventListener('click', () => {
+    document.getElementById('settingsPanel').classList.remove('open');
+    restartGame();
+  });
+});
+</script>
+</body>
+</html>
