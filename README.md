@@ -1,5 +1,5 @@
 # Seasidememorycafe
-
+![image alt](https://github.com/maxhyn/Seasidememorycafe/blob/8b9c5fa7288eb5636a611a0e36b98f6d115417a2/Group%20photo.png)
 # ☕ Seaside Memory Café
 
 
